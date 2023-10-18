@@ -9,7 +9,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231010133617-cdbd5387e2af
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231011161248-cf0bd6e08811
 	github.com/iotaledger/iota.go/v4 v4.0.0-20231017091339-469a6ca13961
-	github.com/labstack/echo/v4 v4.11.1
+	github.com/labstack/echo/v4 v4.11.2
 	go.uber.org/dig v1.17.0
 
 )
