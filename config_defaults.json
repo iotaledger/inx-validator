@@ -30,11 +30,8 @@
   },
   "validator": {
     "committeeBroadcastInterval": "500ms",
-    "candidateBroadcastInterval": "30m",
-    "parentsCount": 8,
     "ignoreBootstrapped": false,
-    "accountAddress": "",
-    "privateKey": ""
+    "accountAddress": ""
   },
   "profiling": {
     "enabled": false,

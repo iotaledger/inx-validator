@@ -132,11 +132,8 @@ Example:
 | Name                       | Description                                                                                                  | Type    | Default value |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
 | committeeBroadcastInterval | The interval at which the node will broadcast its committee validator block                                  | string  | "500ms"       |
-| candidateBroadcastInterval | The interval at which the node will broadcast its candidate validator block                                  | string  | "30m"         |
-| parentsCount               | The number of parents that node will choose for its validator blocks                                         | int     | 8             |
 | ignoreBootstrapped         | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
 | accountAddress             | The account address of the validator account that will issue the blocks                                      | string  | ""            |
-| privateKey                 | The private key of the validator account that will issue the blocks                                          | string  | ""            |
 
 Example:
 
@@ -144,11 +141,8 @@ Example:
   {
     "validator": {
       "committeeBroadcastInterval": "500ms",
-      "candidateBroadcastInterval": "30m",
-      "parentsCount": 8,
       "ignoreBootstrapped": false,
-      "accountAddress": "",
-      "privateKey": ""
+      "accountAddress": ""
     }
   }
 ```

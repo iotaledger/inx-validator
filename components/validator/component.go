@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
@@ -48,7 +47,6 @@ type dependencies struct {
 	AccountAddress  *iotago.AccountAddress
 	PrivateKey      ed25519.PrivateKey
 	ShutdownHandler *shutdown.ShutdownHandler
-	Echo            *echo.Echo
 }
 
 func provide(c *dig.Container) error {
@@ -58,7 +56,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps depsIn) (*iotago.AccountAddress, error) {
-		if ParamsValidator.PrivateKey == "" {
+		if ParamsValidator.AccountAddress == "" {
 			return nil, ierrors.Errorf("empty bech32 in config")
 		}
 
@@ -162,9 +160,9 @@ func loadEd25519PrivateKeysFromEnvironment(name string) ([]ed25519.PrivateKey, e
 		return nil, ierrors.Errorf("environment variable '%s' not set", name)
 	}
 
-	privateKeysSplitted := strings.Split(keys, ",")
-	privateKeys := make([]ed25519.PrivateKey, len(privateKeysSplitted))
-	for i, key := range privateKeysSplitted {
+	privateKeysSplit := strings.Split(keys, ",")
+	privateKeys := make([]ed25519.PrivateKey, len(privateKeysSplit))
+	for i, key := range privateKeysSplit {
 		privateKey, err := crypto.ParseEd25519PrivateKeyFromString(key)
 		if err != nil {
 			return nil, ierrors.Errorf("environment variable '%s' contains an invalid private key '%s'", name, key)
