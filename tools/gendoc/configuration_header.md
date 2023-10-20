@@ -1,7 +1,6 @@
 ---
-description: This section describes the configuration parameters and their types for INX-Indexer.
+description: This section describes the configuration parameters and their types for INX-Validator.
 keywords:
-- IOTA Node 
 - IOTA Core Node
 - Validator
 - Configuration
@@ -28,4 +27,3 @@ You can always get the most up-to-date description of the config parameters by r
 ```bash
 inx-validator -h --full
 ```
-

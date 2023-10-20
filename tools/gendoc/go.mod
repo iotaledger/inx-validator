@@ -1,4 +1,4 @@
-module github.com/iotaledger/inx-mqtt/tools/gendoc
+module github.com/iotaledger/inx-faucet/tools/gendoc
 
 go 1.21
 
@@ -6,8 +6,8 @@ replace github.com/iotaledger/inx-validator => ../../
 
 require (
 	github.com/iotaledger/hive.go/app v0.0.0-20231019175611-f85bce9102d1
-	github.com/iotaledger/hive.go/apputils v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/inx-validator v0.0.0-00010101000000-000000000000
+	github.com/iotaledger/hive.go/apputils v0.0.0-20230417125513-e2e89991217f
+	github.com/iotaledger/inx-validator v0.0.0-20231018114237-1884f77aadc5
 )
 
 require (
@@ -16,14 +16,12 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/ethereum/go-ethereum v1.13.4 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fbiville/markdown-table-formatter v0.3.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -65,6 +63,7 @@ require (
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
@@ -79,7 +78,6 @@ require (
 	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231009173412-8bfb1ae86b6c // indirect
 	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
