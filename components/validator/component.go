@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
@@ -68,7 +67,7 @@ func provide(c *dig.Container) error {
 			return nil, ierrors.Wrapf(err, "invalid bech32 address: %s", ParamsValidator.AccountAddress)
 		}
 
-		if deps.NodeBridge.APIProvider().CurrentAPI().ProtocolParameters().Bech32HRP() != hrp {
+		if deps.NodeBridge.APIProvider().CommittedAPI().ProtocolParameters().Bech32HRP() != hrp {
 			return nil, ierrors.Wrapf(err, "invalid bech32 address prefix: %s", hrp)
 		}
 
@@ -128,16 +127,14 @@ func run() error {
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	account, exists, err := deps.NodeBridge.Account(validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
+	isAccountValidator, err := deps.NodeBridge.ReadIsAccountValidator(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
 	if err != nil {
 		Component.LogErrorf("error when retrieving Validator account %s: %w", validatorAccount.ID(), err)
 
 		return
 	}
 
-	// TODO: is use of current API correct?
-	currentAPI := deps.NodeBridge.APIProvider().CurrentAPI()
-	if !exists || account.StakeEndEpoch <= currentAPI.TimeProvider().EpochFromSlot(currentAPI.TimeProvider().SlotFromTime(time.Now())) {
+	if isAccountValidator {
 		if prevValue := isValidator.Swap(false); prevValue {
 			// If the account stops being a validator, don't issue any blocks.
 			Component.LogInfof("validator account %s stopped being a validator", validatorAccount.ID())
@@ -150,7 +147,7 @@ func checkValidatorStatus(ctx context.Context) {
 	if prevValue := isValidator.Swap(true); !prevValue {
 		Component.LogInfof("validator account %s became a validator", validatorAccount.ID())
 		// If the account becomes a validator, start issue either candidate blocks to announce candidacy for committee or validator blocks.
-		tryissueValidatorBlock(ctx)
+		tryIssueValidatorBlock(ctx)
 	}
 }
 
