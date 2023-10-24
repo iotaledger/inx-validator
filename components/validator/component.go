@@ -35,9 +35,8 @@ var (
 	deps      dependencies
 
 	isValidator      atomic.Bool
-	executor         *timed.TaskExecutor[iotago.AccountID]
+	executor         *timed.TaskExecutor[ValidatorTaskType]
 	validatorAccount Account
-	ShutdownHandler  *shutdown.ShutdownHandler
 )
 
 type dependencies struct {
@@ -105,7 +104,7 @@ func provide(c *dig.Container) error {
 func run() error {
 	validatorAccount = NewEd25519Account(deps.AccountAddress.AccountID(), deps.PrivateKey)
 
-	executor = timed.NewTaskExecutor[iotago.AccountID](1)
+	executor = timed.NewTaskExecutor[ValidatorTaskType](1)
 
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		Component.LogInfof("Starting Validator with IssuerID: %s", validatorAccount.ID())
@@ -136,7 +135,8 @@ func checkValidatorStatus(ctx context.Context) {
 		if prevValue := isValidator.Swap(false); prevValue {
 			// If the account stops being a validator, don't issue any blocks.
 			Component.LogInfof("validator account %s stopped being a validator", validatorAccount.ID())
-			executor.Cancel(validatorAccount.ID())
+			executor.Cancel(CandidateTask)
+			executor.Cancel(CommitteeTask)
 		}
 
 		return
@@ -144,8 +144,12 @@ func checkValidatorStatus(ctx context.Context) {
 
 	if prevValue := isValidator.Swap(true); !prevValue {
 		Component.LogInfof("validator account %s became a validator", validatorAccount.ID())
-		// If the account becomes a validator, start issue either candidate blocks to announce candidacy for committee or validator blocks.
-		tryIssueValidatorBlock(ctx)
+
+		// If the account is a validator, start issuing validator blocks when the account is part of the committee.
+		committeeMemberAction(ctx)
+
+		// If the account is a validator, start issuing blocks to announce candidacy for the committee.
+		candidateAction(ctx)
 	}
 }
 

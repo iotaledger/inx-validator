@@ -9,7 +9,9 @@ import (
 // ParametersValidator contains the definition of the configuration parameters used by the Validator component.
 type ParametersValidator struct {
 	// CommitteeBroadcastInterval the interval at which the node will broadcast its committee validator block.
-	CommitteeBroadcastInterval time.Duration `default:"500ms" usage:"the interval at which the node will broadcast its committee validator block"`
+	CommitteeBroadcastInterval time.Duration `default:"500ms" usage:"the interval at which committee validator block will be broadcast"`
+	// CandidacyRetryInterval the interval at which broadcast of candidacy announcement block will be retried
+	CandidacyRetryInterval time.Duration `default:"10s" usage:"the interval at which broadcast of candidacy announcement block will be retried"`
 	// IgnoreBootstrapped sets whether the Validator component should start issuing validator blocks before the main engine is bootstrapped.
 	IgnoreBootstrapped bool `default:"false" usage:"whether the Validator component should start issuing validator blocks before the main engine is bootstrapped"`
 	// Account the address of the account that is used to issue the blocks.

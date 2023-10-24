@@ -11,45 +11,85 @@ import (
 
 var ErrBlockTooRecent = ierrors.New("block is too recent compared to latest commitment")
 
-// TODO: rename this method as it's more general than that
-func tryIssueValidatorBlock(ctx context.Context) {
+type ValidatorTaskType uint8
+
+const (
+	CandidateTask ValidatorTaskType = iota
+	CommitteeTask
+)
+
+func candidateAction(ctx context.Context) {
 	blockIssuingTime := time.Now()
-	nextBroadcast := blockIssuingTime.Add(ParamsValidator.CommitteeBroadcastInterval)
 	currentAPI := deps.NodeBridge.APIProvider().APIForTime(blockIssuingTime)
+	currentSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
-	// Use 'defer' because nextBroadcast is updated during function execution, and the value at the end needs to be used.
-	defer func() {
-		executor.ExecuteAt(validatorAccount.ID(), func() { tryIssueValidatorBlock(ctx) }, nextBroadcast)
-	}()
-
-	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
-	isCommitteeMember, err := deps.NodeBridge.ReadIsCommitteeMember(ctx, validatorAccount.ID(), blockSlot)
+	isCandidate, err := deps.NodeBridge.ReadIsCandidate(ctx, validatorAccount.ID(), currentSlot)
 	if err != nil {
-		Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), blockSlot, err.Error())
+		Component.LogWarnf("error while checking if account is already a candidate: %s", err.Error())
+		// If there is an error, then retry registering as a candidate.
+		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, blockIssuingTime.Add(ParamsValidator.CandidacyRetryInterval))
+
+		return
+	}
+	if isCandidate {
+		Component.LogDebugf("not issuing candidacy announcement block as account %s is already registered as candidate in epoch %d", validatorAccount.ID(), currentAPI.TimeProvider().EpochFromSlot(currentSlot))
+		// If an account is a registered candidate, then try to register as a candidate in the next epoch.
+		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
+
+		return
+	}
+	if epochNearingThresholdSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot)) - currentAPI.ProtocolParameters().EpochNearingThreshold(); currentSlot > epochNearingThresholdSlot {
+		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), currentSlot, epochNearingThresholdSlot)
+		// If it's too late to register as a candidate, then try to register in the next epoch.
+		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
+
+		return
+	}
+
+	// Schedule next committeeMemberAction regardless of the result below.
+	// If a node is not bootstrapped, then retry until it is bootstrapped.
+	// The candidacy block might be issued and fail to be accepted in the node for various reasons,
+	// so we should stop issuing candidacy blocks only when the account is successfully registered as a candidate.
+	// For this reason,
+	// retry interval parameter should be bigger than the fishing threshold to avoid issuing redundant candidacy blocks.
+	executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, blockIssuingTime.Add(ParamsValidator.CandidacyRetryInterval))
+
+	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
+		Component.LogDebug("not issuing candidate block because node is not bootstrapped yet.")
+
+		return
+	}
+
+	if err := issueCandidateBlock(ctx, blockIssuingTime, currentAPI); err != nil {
+		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
+	}
+
+}
+
+func committeeMemberAction(ctx context.Context) {
+	now := time.Now()
+	currentAPI := deps.NodeBridge.APIProvider().APIForTime(now)
+	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
+	currentEpoch := currentAPI.TimeProvider().EpochFromSlot(currentSlot)
+
+	isCommitteeMember, err := deps.NodeBridge.ReadIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
+	if err != nil {
+		Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
+		executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
 
 		return
 	}
 
 	if !isCommitteeMember {
-		if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
-			Component.LogDebug("not issuing candidate block because node is not bootstrapped yet.")
-
-			return
-		}
-
-		if err := issueCandidateBlock(ctx, blockIssuingTime, currentAPI); err != nil {
-			Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
-
-			return
-		}
-
-		// update nextBroadcast value here, so that this updated value is used in the `defer`
-		// callback to schedule issuing of the next block at a different interval than for committee members
-		blockEpoch := currentAPI.TimeProvider().EpochFromSlot(blockSlot)
-		nextBroadcast = currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(blockEpoch + 1))
+		Component.LogDebug("account %s is not a committee member in epoch %d", currentEpoch)
+		executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentEpoch+1)))
 
 		return
 	}
+
+	// Schedule next committeeMemberAction regardless of whether the node is bootstrapped or validator block is issued
+	// as it must be issued as part of validator's responsibility.
+	executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
 
 	// Validator block may ignore the bootstrap flag in order to bootstrap the network and begin acceptance.
 	if !ParamsValidator.IgnoreBootstrapped && !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
@@ -58,28 +98,11 @@ func tryIssueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	issueValidatorBlock(ctx, blockIssuingTime, currentAPI)
+	issueValidatorBlock(ctx, now, currentAPI)
 }
 
 func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
-
-	isCandidate, err := deps.NodeBridge.ReadIsCandidate(ctx, validatorAccount.ID(), blockSlot)
-	if err != nil {
-		return ierrors.Wrap(err, "error while checking if account is already a candidate")
-	}
-
-	if isCandidate {
-		Component.LogDebugf("not issuing candidacy announcement block as account %s is already registered as candidate in epoch %d", validatorAccount.ID(), currentAPI.TimeProvider().EpochFromSlot(blockSlot))
-
-		return nil
-	}
-
-	if epochNearingThresholdSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(blockSlot)) - currentAPI.ProtocolParameters().EpochNearingThreshold(); blockSlot > epochNearingThresholdSlot {
-		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), blockSlot, epochNearingThresholdSlot)
-
-		return nil
-	}
 
 	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockMaxParents)
 
