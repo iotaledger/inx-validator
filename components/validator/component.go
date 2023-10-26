@@ -35,7 +35,7 @@ var (
 	deps      dependencies
 
 	isValidator      atomic.Bool
-	executor         *timed.TaskExecutor[ValidatorTaskType]
+	executor         *timed.TaskExecutor[TaskType]
 	validatorAccount Account
 )
 
@@ -104,7 +104,7 @@ func provide(c *dig.Container) error {
 func run() error {
 	validatorAccount = NewEd25519Account(deps.AccountAddress.AccountID(), deps.PrivateKey)
 
-	executor = timed.NewTaskExecutor[ValidatorTaskType](1)
+	executor = timed.NewTaskExecutor[TaskType](1)
 
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		Component.LogInfof("Starting Validator with IssuerID: %s", validatorAccount.ID())

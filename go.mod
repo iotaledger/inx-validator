@@ -7,7 +7,7 @@ require (
 	github.com/iotaledger/hive.go/crypto v0.0.0-20231020115340-13da292c580b
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20231020115340-13da292c580b
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231020115340-13da292c580b
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231024101555-660b434164ff
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231026074243-aa6acabc771d
 	github.com/iotaledger/iota.go/v4 v4.0.0-20231023205010-58a0b5c7fe6d
 	go.uber.org/dig v1.17.1
 
@@ -41,7 +41,7 @@ require (
 	github.com/iotaledger/hive.go/logger v0.0.0-20231020115340-13da292c580b // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231020115340-13da292c580b // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231020115340-13da292c580b // indirect
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231024101228-5d9abdd08941 // indirect
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231026074031-5d93e02f7777 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect

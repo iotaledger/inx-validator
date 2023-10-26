@@ -11,10 +11,10 @@ import (
 
 var ErrBlockTooRecent = ierrors.New("block is too recent compared to latest commitment")
 
-type ValidatorTaskType uint8
+type TaskType uint8
 
 const (
-	CandidateTask ValidatorTaskType = iota
+	CandidateTask TaskType = iota
 	CommitteeTask
 )
 
@@ -31,6 +31,7 @@ func candidateAction(ctx context.Context) {
 
 		return
 	}
+
 	if isCandidate {
 		Component.LogDebugf("not issuing candidacy announcement block as account %s is already registered as candidate in epoch %d", validatorAccount.ID(), currentAPI.TimeProvider().EpochFromSlot(currentSlot))
 		// If an account is a registered candidate, then try to register as a candidate in the next epoch.
@@ -38,6 +39,7 @@ func candidateAction(ctx context.Context) {
 
 		return
 	}
+
 	if epochNearingThresholdSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot)) - currentAPI.ProtocolParameters().EpochNearingThreshold(); currentSlot > epochNearingThresholdSlot {
 		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), currentSlot, epochNearingThresholdSlot)
 		// If it's too late to register as a candidate, then try to register in the next epoch.
@@ -148,18 +150,22 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockTypeValidationMaxParents)
 
 	addressableCommitment, err := getAddressableCommitment(ctx, currentAPI.TimeProvider().SlotFromTime(blockIssuingTime))
-	//if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
-	//	// TODO: is the chain going to be revived if node is not marked as bootstrapped?
-	//	commitment, parentID, reviveChainErr := reviveChain(ctx, blockIssuingTime)
-	//	if reviveChainErr != nil {
-	//		Component.LogError("error reviving chain: %s", reviveChainErr.Error())
-	//		return
-	//	}
-	//
-	//	addressableCommitment = commitment
-	//	strongParents = []iotago.BlockID{parentID}
-	//} else
-	if err != nil {
+	if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
+		// If both validator plugin and the node it's connected to crash and restart at the same time,
+		// then revival will not be possible if `IgnoreBootstrapFlag` is not set,
+		// because the validator will only issue blocks if the flag is set OR the node is bootstrapped
+		// (which will not happen, because the node restarted and reset its bootstrapped flag).
+		// In such case, a manual intervention is necessary by the operator to set the `IgnoreBootstrappedFlag`
+		// to allow the validator to issue validation blocks.
+		commitment, parentID, reviveChainErr := reviveChain(ctx, blockIssuingTime)
+		if reviveChainErr != nil {
+			Component.LogError("error reviving chain: %s", reviveChainErr.Error())
+			return
+		}
+
+		addressableCommitment = commitment
+		strongParents = []iotago.BlockID{parentID}
+	} else if err != nil {
 		Component.LogWarnf("error getting commitment: %s", err.Error())
 
 		return
@@ -194,43 +200,48 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 }
 
 // TODO: should this be part of the node maybe?
-//func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, error) {
-//	lastCommittedSlot := deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot()
-//	apiForSlot := deps.NodeBridge.APIProvider().APIForSlot(lastCommittedSlot)
-//
-//	// Get a rootblock as recent as possible for the parent.
-//	parentBlockID := iotago.EmptyBlockID
-//	for rootBlock := range deps.NodeBridge.ReadActiveRootBlocks() {
-//		if rootBlock.Slot() > parentBlockID.Slot() {
-//			parentBlockID = rootBlock
-//		}
-//
-//		// Exit the loop if we found a rootblock in the last committed slot (which is the highest we can get).
-//		if parentBlockID.Slot() == lastCommittedSlot {
-//			break
-//		}
-//	}
-//
-//	issuingSlot := apiForSlot.TimeProvider().SlotFromTime(issuingTime)
-//
-//	// Force commitments until minCommittableAge relative to the block's issuing time. We basically "pretend" that
-//	// this block was already accepted at the time of issuing so that we have a commitment to reference.
-//	if issuingSlot < apiForSlot.ProtocolParameters().MinCommittableAge() { // Should never happen as we're beyond maxCommittableAge which is > minCommittableAge.
-//		return nil, iotago.EmptyBlockID, ierrors.Errorf("issuing slot %d is smaller than min committable age %d", issuingSlot, apiForSlot.ProtocolParameters().MinCommittableAge())
-//	}
-//	commitUntilSlot := issuingSlot - apiForSlot.ProtocolParameters().MinCommittableAge()
-//
-//	if err := deps.NodeBridge.ForceCommitUntil(commitUntilSlot); err != nil {
-//		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to force commit until slot %d", commitUntilSlot)
-//	}
-//
-//	commitment, err := deps.NodeBridge.Commitment(ctx, commitUntilSlot)
-//	if err != nil {
-//		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
-//	}
-//
-//	return commitment.Commitment, parentBlockID, nil
-//}
+func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, error) {
+	lastCommittedSlot := deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot()
+	apiForSlot := deps.NodeBridge.APIProvider().APIForSlot(lastCommittedSlot)
+
+	activeRootBlocks, err := deps.NodeBridge.ActiveRootBlocks(ctx)
+	if err != nil {
+		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to retrieve active root blocks")
+	}
+
+	// Get a rootblock as recent as possible for the parent.
+	parentBlockID := iotago.EmptyBlockID
+	for rootBlock := range activeRootBlocks {
+		if rootBlock.Slot() > parentBlockID.Slot() {
+			parentBlockID = rootBlock
+		}
+
+		// Exit the loop if we found a rootblock in the last committed slot (which is the highest we can get).
+		if parentBlockID.Slot() == lastCommittedSlot {
+			break
+		}
+	}
+
+	issuingSlot := apiForSlot.TimeProvider().SlotFromTime(issuingTime)
+
+	// Force commitments until minCommittableAge relative to the block's issuing time. We basically "pretend" that
+	// this block was already accepted at the time of issuing so that we have a commitment to reference.
+	if issuingSlot < apiForSlot.ProtocolParameters().MinCommittableAge() { // Should never happen as we're beyond maxCommittableAge which is > minCommittableAge.
+		return nil, iotago.EmptyBlockID, ierrors.Errorf("issuing slot %d is smaller than min committable age %d", issuingSlot, apiForSlot.ProtocolParameters().MinCommittableAge())
+	}
+	commitUntilSlot := issuingSlot - apiForSlot.ProtocolParameters().MinCommittableAge()
+
+	if err = deps.NodeBridge.ForceCommitUntil(ctx, commitUntilSlot); err != nil {
+		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to force commit until slot %d", commitUntilSlot)
+	}
+
+	commitment, err := deps.NodeBridge.Commitment(ctx, commitUntilSlot)
+	if err != nil {
+		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
+	}
+
+	return commitment.Commitment, parentBlockID, nil
+}
 
 func getAddressableCommitment(ctx context.Context, blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
 	protoParams := deps.NodeBridge.APIProvider().APIForSlot(blockSlot).ProtocolParameters()
