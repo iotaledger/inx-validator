@@ -19,15 +19,15 @@ const (
 )
 
 func candidateAction(ctx context.Context) {
-	blockIssuingTime := time.Now()
-	currentAPI := deps.NodeBridge.APIProvider().APIForTime(blockIssuingTime)
-	currentSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
+	now := time.Now()
+	currentAPI := deps.NodeBridge.APIProvider().APIForTime(now)
+	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
 
 	isCandidate, err := deps.NodeBridge.ReadIsCandidate(ctx, validatorAccount.ID(), currentSlot)
 	if err != nil {
 		Component.LogWarnf("error while checking if account is already a candidate: %s", err.Error())
 		// If there is an error, then retry registering as a candidate.
-		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, blockIssuingTime.Add(ParamsValidator.CandidacyRetryInterval))
+		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
 
 		return
 	}
@@ -54,7 +54,7 @@ func candidateAction(ctx context.Context) {
 	// so we should stop issuing candidacy blocks only when the account is successfully registered as a candidate.
 	// For this reason,
 	// retry interval parameter should be bigger than the fishing threshold to avoid issuing redundant candidacy blocks.
-	executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, blockIssuingTime.Add(ParamsValidator.CandidacyRetryInterval))
+	executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
 
 	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
 		Component.LogDebug("not issuing candidate block because node is not bootstrapped yet.")
@@ -62,7 +62,7 @@ func candidateAction(ctx context.Context) {
 		return
 	}
 
-	if err := issueCandidateBlock(ctx, blockIssuingTime, currentAPI); err != nil {
+	if err = issueCandidateBlock(ctx, now, currentAPI); err != nil {
 		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
 	}
 
@@ -100,13 +100,18 @@ func committeeMemberAction(ctx context.Context) {
 		return
 	}
 
-	issueValidatorBlock(ctx, now, currentAPI)
+	if err = issueValidatorBlock(ctx, now, currentAPI); err != nil {
+		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
+	}
 }
 
 func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
 	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockMaxParents)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get tips for candidate block")
+	}
 
 	addressableCommitment, err := getAddressableCommitment(ctx, blockSlot)
 	if err != nil {
@@ -139,15 +144,16 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	return nil
 }
 
-func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) {
+func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
 	protocolParametersHash, err := currentAPI.ProtocolParameters().Hash()
 	if err != nil {
-		Component.LogWarnf("failed to get protocol parameters hash: %s", err.Error())
-
-		return
+		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
 	}
 
 	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockTypeValidationMaxParents)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get tips")
+	}
 
 	addressableCommitment, err := getAddressableCommitment(ctx, currentAPI.TimeProvider().SlotFromTime(blockIssuingTime))
 	if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
@@ -159,16 +165,13 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		// to allow the validator to issue validation blocks.
 		commitment, parentID, reviveChainErr := reviveChain(ctx, blockIssuingTime)
 		if reviveChainErr != nil {
-			Component.LogError("error reviving chain: %s", reviveChainErr.Error())
-			return
+			return ierrors.Wrapf(err, "error reviving chain")
 		}
 
 		addressableCommitment = commitment
 		strongParents = []iotago.BlockID{parentID}
 	} else if err != nil {
-		Component.LogWarnf("error getting commitment: %s", err.Error())
-
-		return
+		return ierrors.Wrapf(err, "error getting commitment")
 	}
 
 	// create the validation block here using the validation block builder from iota.go
@@ -184,22 +187,19 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
 		Build()
 	if err != nil {
-		Component.LogWarnf("error creating validation block: %s", err.Error())
-
-		return
+		return ierrors.Wrapf(err, "error creating validation block")
 	}
 
 	blockID, err := deps.NodeBridge.SubmitBlock(ctx, validationBlock)
 	if err != nil {
-		Component.LogWarnf("error issuing validator block: %s", err.Error())
-
-		return
+		return ierrors.Wrapf(err, "error issuing validator block")
 	}
 
 	Component.LogDebugf("issued validator block: %s - commitment %s %d - latest finalized slot %d", blockID, validationBlock.SlotCommitmentID, validationBlock.SlotCommitmentID.Slot(), validationBlock.LatestFinalizedSlot)
+
+	return nil
 }
 
-// TODO: should this be part of the node maybe?
 func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, error) {
 	lastCommittedSlot := deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot()
 	apiForSlot := deps.NodeBridge.APIProvider().APIForSlot(lastCommittedSlot)
