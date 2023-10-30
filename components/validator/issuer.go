@@ -42,7 +42,7 @@ func candidateAction(ctx context.Context) {
 
 	epochEndSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot))
 	if currentSlot+currentAPI.ProtocolParameters().EpochNearingThreshold() > epochEndSlot {
-		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), currentSlot, epochNearingThresholdSlot)
+		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), currentSlot, currentSlot-currentAPI.ProtocolParameters().EpochNearingThreshold())
 		// If it's too late to register as a candidate, then try to register in the next epoch.
 		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
 
@@ -139,7 +139,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		return ierrors.Wrap(err, "error issuing candidacy announcement block")
 	}
 
-	Component.LogDebugf("issued candidacy announcement block: %s - commitment %s %d - latest finalized slot %d", blockID, candidacyBlock.SlotCommitmentID, candidacyBlock.SlotCommitmentID.Slot(), candidacyBlock.LatestFinalizedSlot)
+	Component.LogDebugf("issued candidacy announcement block: %s - commitment %s %d - latest finalized slot %d", blockID, candidacyBlock.Header.SlotCommitmentID, candidacyBlock.Header.SlotCommitmentID.Slot(), candidacyBlock.Header.LatestFinalizedSlot)
 
 	return nil
 }
@@ -195,7 +195,7 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		return ierrors.Wrapf(err, "error issuing validator block")
 	}
 
-	Component.LogDebugf("issued validator block: %s - commitment %s %d - latest finalized slot %d", blockID, validationBlock.SlotCommitmentID, validationBlock.SlotCommitmentID.Slot(), validationBlock.LatestFinalizedSlot)
+	Component.LogDebugf("issued validator block: %s - commitment %s %d - latest finalized slot %d", blockID, validationBlock.Header.SlotCommitmentID, validationBlock.Header.SlotCommitmentID.Slot(), validationBlock.Header.LatestFinalizedSlot)
 
 	return nil
 }
