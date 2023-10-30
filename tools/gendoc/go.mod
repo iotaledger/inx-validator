@@ -7,7 +7,7 @@ replace github.com/iotaledger/inx-validator => ../../
 require (
 	github.com/iotaledger/hive.go/app v0.0.0-20231020115340-13da292c580b
 	github.com/iotaledger/hive.go/apputils v0.0.0-20230417125513-e2e89991217f
-	github.com/iotaledger/inx-validator v0.0.0-20231018114237-1884f77aadc5
+	github.com/iotaledger/inx-validator v0.0.0-00010101000000-000000000000
 )
 
 require (
