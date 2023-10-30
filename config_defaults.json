@@ -30,6 +30,7 @@
   },
   "validator": {
     "committeeBroadcastInterval": "500ms",
+    "candidacyRetryInterval": "10s",
     "ignoreBootstrapped": false,
     "accountAddress": ""
   },
