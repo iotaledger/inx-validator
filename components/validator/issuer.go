@@ -40,7 +40,8 @@ func candidateAction(ctx context.Context) {
 		return
 	}
 
-	if epochNearingThresholdSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot)) - currentAPI.ProtocolParameters().EpochNearingThreshold(); currentSlot > epochNearingThresholdSlot {
+	epochEndSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot))
+	if currentSlot+currentAPI.ProtocolParameters().EpochNearingThreshold() > epochEndSlot {
 		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), currentSlot, epochNearingThresholdSlot)
 		// If it's too late to register as a candidate, then try to register in the next epoch.
 		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
@@ -101,7 +102,7 @@ func committeeMemberAction(ctx context.Context) {
 	}
 
 	if err = issueValidatorBlock(ctx, now, currentAPI); err != nil {
-		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
+		Component.LogWarnf("error while trying to issue validator block: %s", err.Error())
 	}
 }
 
@@ -110,7 +111,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 
 	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockMaxParents)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get tips for candidate block")
+		return ierrors.Wrapf(err, "failed to get tips")
 	}
 
 	addressableCommitment, err := getAddressableCommitment(ctx, blockSlot)
@@ -118,7 +119,6 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		return ierrors.Wrap(err, "error getting commitment")
 	}
 
-	// create the validation block here using the validation block builder from iota.go
 	candidacyBlock, err := builder.NewBasicBlockBuilder(currentAPI).
 		IssuingTime(blockIssuingTime).
 		SlotCommitmentID(addressableCommitment.MustID()).
@@ -131,7 +131,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
 		Build()
 	if err != nil {
-		return ierrors.Wrap(err, "error creating candidacy announcement block")
+		return ierrors.Wrap(err, "error creating block")
 	}
 
 	blockID, err := deps.NodeBridge.SubmitBlock(ctx, candidacyBlock)

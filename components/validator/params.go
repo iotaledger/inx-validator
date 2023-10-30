@@ -14,7 +14,7 @@ type ParametersValidator struct {
 	CandidacyRetryInterval time.Duration `default:"10s" usage:"the interval at which broadcast of candidacy announcement block will be retried"`
 	// IgnoreBootstrapped sets whether the Validator component should start issuing validator blocks before the main engine is bootstrapped.
 	IgnoreBootstrapped bool `default:"false" usage:"whether the Validator component should start issuing validator blocks before the main engine is bootstrapped"`
-	// Account the address of the account that is used to issue the blocks.
+	// AccountAddress is the address of the account that is used to issue the blocks.
 	AccountAddress string `default:"" usage:"the account address of the validator account that will issue the blocks"`
 }
 

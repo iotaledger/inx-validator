@@ -25,8 +25,8 @@ func init() {
 		Name:     "Validator",
 		DepsFunc: func(cDeps dependencies) { deps = cDeps },
 		Params:   params,
-		Run:      run,
 		Provide:  provide,
+		Run:      run,
 	}
 }
 
@@ -56,21 +56,21 @@ func provide(c *dig.Container) error {
 
 	if err := c.Provide(func(deps depsIn) (*iotago.AccountAddress, error) {
 		if ParamsValidator.AccountAddress == "" {
-			return nil, ierrors.Errorf("empty bech32 in config")
+			return nil, ierrors.Errorf("failed to load account address. error: empty bech32 in config")
 		}
 
 		hrp, addr, err := iotago.ParseBech32(ParamsValidator.AccountAddress)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "invalid bech32 address: %s", ParamsValidator.AccountAddress)
+			return nil, ierrors.Wrapf(err, "failed to load account address. error: invalid bech32 address: %s", ParamsValidator.AccountAddress)
 		}
 
 		if deps.NodeBridge.APIProvider().CommittedAPI().ProtocolParameters().Bech32HRP() != hrp {
-			return nil, ierrors.Wrapf(err, "invalid bech32 address prefix: %s", hrp)
+			return nil, ierrors.Wrapf(err, "failed to load account address. error: invalid bech32 address prefix: %s", hrp)
 		}
 
 		accountAddr, ok := addr.(*iotago.AccountAddress)
 		if !ok {
-			return nil, ierrors.Errorf("invalid bech32 address, not an account: %s", ParamsValidator.AccountAddress)
+			return nil, ierrors.Errorf("failed to load account address. error: invalid bech32 address, not an account: %s", ParamsValidator.AccountAddress)
 		}
 
 		return accountAddr, nil
@@ -109,11 +109,11 @@ func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		Component.LogInfof("Starting Validator with IssuerID: %s", validatorAccount.ID())
 
-		checkValidatorStatus(ctx)
-
 		deps.NodeBridge.Events.LatestCommittedSlotChanged.Hook(func(details *nodebridge.Commitment) {
 			checkValidatorStatus(ctx)
 		}, event.WithWorkerPool(Component.WorkerPool))
+
+		checkValidatorStatus(ctx)
 
 		<-ctx.Done()
 
