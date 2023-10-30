@@ -1,0 +1,40 @@
+{
+  "app": {
+    "checkForUpdates": true,
+    "shutdown": {
+      "stopGracePeriod": "5m",
+      "log": {
+        "enabled": true,
+        "filePath": "shutdown.log"
+      }
+    }
+  },
+  "logger": {
+    "level": "info",
+    "disableCaller": true,
+    "disableStacktrace": false,
+    "stacktraceLevel": "panic",
+    "encoding": "console",
+    "encodingConfig": {
+      "timeEncoder": "rfc3339"
+    },
+    "outputPaths": [
+      "stdout"
+    ],
+    "disableEvents": true
+  },
+  "inx": {
+    "address": "localhost:9029",
+    "maxConnectionAttempts": 30,
+    "targetNetworkName": ""
+  },
+  "validator": {
+    "committeeBroadcastInterval": "500ms",
+    "ignoreBootstrapped": false,
+    "accountAddress": ""
+  },
+  "profiling": {
+    "enabled": false,
+    "bindAddress": "localhost:6060"
+  }
+}
