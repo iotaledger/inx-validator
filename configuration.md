@@ -131,7 +131,8 @@ Example:
 
 | Name                       | Description                                                                                                  | Type    | Default value |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
-| committeeBroadcastInterval | The interval at which the node will broadcast its committee validator block                                  | string  | "500ms"       |
+| committeeBroadcastInterval | The interval at which committee validator block will be broadcast                                            | string  | "500ms"       |
+| candidacyRetryInterval     | The interval at which broadcast of candidacy announcement block will be retried                              | string  | "10s"         |
 | ignoreBootstrapped         | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
 | accountAddress             | The account address of the validator account that will issue the blocks                                      | string  | ""            |
 
@@ -141,6 +142,7 @@ Example:
   {
     "validator": {
       "committeeBroadcastInterval": "500ms",
+      "candidacyRetryInterval": "10s",
       "ignoreBootstrapped": false,
       "accountAddress": ""
     }
