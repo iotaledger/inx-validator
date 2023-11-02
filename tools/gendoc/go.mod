@@ -44,7 +44,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231027195901-620bd7470e42 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231031135002-4c79ea5193f5 // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231031134131-b6ad918dc1ac // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231031113109-5d7d59311967 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231102113728-20b8d01e826e // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
