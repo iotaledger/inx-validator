@@ -109,7 +109,7 @@ func committeeMemberAction(ctx context.Context) {
 func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
-	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockMaxParents)
+	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BasicBlockMaxParents)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get tips")
 	}
@@ -150,7 +150,7 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
 	}
 
-	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BlockTypeValidationMaxParents)
+	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.ValidationBlockMaxParents)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get tips")
 	}
