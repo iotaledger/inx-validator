@@ -42,7 +42,7 @@ func candidateAction(ctx context.Context) {
 
 	epochEndSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot))
 	if currentSlot+currentAPI.ProtocolParameters().EpochNearingThreshold() > epochEndSlot {
-		Component.LogDebugf("not issuing candidacy announcement for account %s as the slot the block would be issued in (%d) is past the Epoch Nearing Threshold (%d)", validatorAccount.ID(), currentSlot, currentSlot-currentAPI.ProtocolParameters().EpochNearingThreshold())
+		Component.LogDebugf("not issuing candidacy announcement for account %s as block's slot would be issued in (%d) is past the Epoch Nearing Threshold (%d) of epoch %d", validatorAccount.ID(), currentSlot, epochEndSlot-currentAPI.ProtocolParameters().EpochNearingThreshold(), currentAPI.TimeProvider().EpochFromSlot(currentSlot))
 		// If it's too late to register as a candidate, then try to register in the next epoch.
 		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
 
