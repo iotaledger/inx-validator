@@ -66,7 +66,6 @@ func candidateAction(ctx context.Context) {
 	if err = issueCandidateBlock(ctx, now, currentAPI); err != nil {
 		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
 	}
-
 }
 
 func committeeMemberAction(ctx context.Context) {
@@ -75,33 +74,38 @@ func committeeMemberAction(ctx context.Context) {
 	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
 	currentEpoch := currentAPI.TimeProvider().EpochFromSlot(currentSlot)
 
-	isCommitteeMember, err := deps.NodeBridge.ReadIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
-	if err != nil {
-		Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
-		executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
+	// If we are bootstrapped let's check if we are part of the committee.
+	if deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
+		isCommitteeMember, err := deps.NodeBridge.ReadIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
+		if err != nil {
+			Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
+			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
 
-		return
-	}
+			return
+		}
 
-	if !isCommitteeMember {
-		Component.LogDebug("account %s is not a committee member in epoch %d", currentEpoch)
-		executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentEpoch+1)))
+		if !isCommitteeMember {
+			Component.LogDebug("account %s is not a committee member in epoch %d", currentEpoch)
+			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentEpoch+1)))
 
-		return
+			return
+		}
 	}
 
 	// Schedule next committeeMemberAction regardless of whether the node is bootstrapped or validator block is issued
 	// as it must be issued as part of validator's responsibility.
 	executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
 
-	// Validator block may ignore the bootstrap flag in order to bootstrap the network and begin acceptance.
-	if !ParamsValidator.IgnoreBootstrapped && !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
+	// If we are not bootstrapped and we are _not_ ignoring such condition, we return.
+	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() && !ParamsValidator.IgnoreBootstrapped {
 		Component.LogDebug("not issuing validator block because node is not bootstrapped yet.")
 
 		return
 	}
 
-	if err = issueValidatorBlock(ctx, now, currentAPI); err != nil {
+	// If we are either bootstrapped (and we are part of the committee) or we are ignoring being bootstrapped we issue
+	// a validation block, reviving the chain if necessary.
+	if err := issueValidatorBlock(ctx, now, currentAPI); err != nil {
 		Component.LogWarnf("error while trying to issue validator block: %s", err.Error())
 	}
 }
