@@ -126,7 +126,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	candidacyBlock, err := builder.NewBasicBlockBuilder(currentAPI).
 		IssuingTime(blockIssuingTime).
 		SlotCommitmentID(addressableCommitment.MustID()).
-		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot()).
+		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot).
 		StrongParents(strongParents).
 		WeakParents(weakParents).
 		ShallowLikeParents(shallowLikeParents).
@@ -184,7 +184,7 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		ProtocolParametersHash(protocolParametersHash).
 		SlotCommitmentID(addressableCommitment.MustID()).
 		HighestSupportedVersion(deps.NodeBridge.APIProvider().LatestAPI().Version()).
-		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot()).
+		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot).
 		StrongParents(strongParents).
 		WeakParents(weakParents).
 		ShallowLikeParents(shallowLikeParents).
@@ -249,10 +249,7 @@ func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment
 
 func getAddressableCommitment(ctx context.Context, blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
 	protoParams := deps.NodeBridge.APIProvider().APIForSlot(blockSlot).ProtocolParameters()
-	commitment, err := deps.NodeBridge.LatestCommitment()
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "error loading latest commitment")
-	}
+	commitment := deps.NodeBridge.LatestCommitment().Commitment
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
 		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
