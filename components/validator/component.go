@@ -149,7 +149,9 @@ func checkValidatorStatus(ctx context.Context) {
 		committeeMemberAction(ctx)
 
 		// If the account is a validator, start issuing blocks to announce candidacy for the committee.
-		candidateAction(ctx)
+		if ParamsValidator.IssueCandidacyPayload {
+			candidateAction(ctx)
+		}
 	}
 }
 
