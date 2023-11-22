@@ -31,6 +31,7 @@
   "validator": {
     "committeeBroadcastInterval": "500ms",
     "candidacyRetryInterval": "10s",
+    "issueCandidacyPayload": true,
     "ignoreBootstrapped": false,
     "accountAddress": ""
   },
