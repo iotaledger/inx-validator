@@ -12,6 +12,8 @@ type ParametersValidator struct {
 	CommitteeBroadcastInterval time.Duration `default:"500ms" usage:"the interval at which committee validator block will be broadcast"`
 	// CandidacyRetryInterval the interval at which broadcast of candidacy announcement block will be retried
 	CandidacyRetryInterval time.Duration `default:"10s" usage:"the interval at which broadcast of candidacy announcement block will be retried"`
+	// IssueCandidacyPayload sets whether the node should issue a candidacy payload.
+	IssueCandidacyPayload bool `default:"true" usage:"whether the node should issue a candidacy payload"`
 	// IgnoreBootstrapped sets whether the Validator component should start issuing validator blocks before the main engine is bootstrapped.
 	IgnoreBootstrapped bool `default:"false" usage:"whether the Validator component should start issuing validator blocks before the main engine is bootstrapped"`
 	// AccountAddress is the address of the account that is used to issue the blocks.
