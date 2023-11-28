@@ -42,7 +42,7 @@ var (
 type dependencies struct {
 	dig.In
 
-	NodeBridge      *nodebridge.NodeBridge
+	NodeBridge      nodebridge.NodeBridge
 	AccountAddress  *iotago.AccountAddress
 	PrivateKey      ed25519.PrivateKey
 	ShutdownHandler *shutdown.ShutdownHandler
@@ -51,7 +51,7 @@ type dependencies struct {
 func provide(c *dig.Container) error {
 	type depsIn struct {
 		dig.In
-		NodeBridge *nodebridge.NodeBridge
+		NodeBridge nodebridge.NodeBridge
 	}
 
 	if err := c.Provide(func(deps depsIn) (*iotago.AccountAddress, error) {
@@ -109,7 +109,7 @@ func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		Component.LogInfof("Starting Validator with IssuerID: %s", validatorAccount.ID())
 
-		deps.NodeBridge.Events.LatestCommitmentChanged.Hook(func(details *nodebridge.Commitment) {
+		deps.NodeBridge.Events().LatestCommitmentChanged.Hook(func(details *nodebridge.Commitment) {
 			checkValidatorStatus(ctx)
 		}, event.WithWorkerPool(Component.WorkerPool))
 
