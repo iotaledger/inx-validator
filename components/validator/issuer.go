@@ -203,7 +203,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		return ierrors.Wrapf(err, "error issuing validation block")
 	}
 
-	Component.LogDebugf("issued validation block: %s - commitment %s %d - latest finalized slot %d - broadcast interval %dms", blockID, validationBlock.Header.SlotCommitmentID, validationBlock.Header.SlotCommitmentID.Slot(), validationBlock.Header.LatestFinalizedSlot, committeeBroadcastInterval.Milliseconds())
+	Component.LogDebugf("issued validation block: %s - commitment %s %d - latest finalized slot %d - broadcast interval %v", blockID, validationBlock.Header.SlotCommitmentID, validationBlock.Header.SlotCommitmentID.Slot(), validationBlock.Header.LatestFinalizedSlot, committeeBroadcastInterval.Truncate(time.Millisecond))
 
 	return nil
 }
