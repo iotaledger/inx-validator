@@ -109,7 +109,7 @@ func committeeMemberAction(ctx context.Context) {
 
 	// If we are either bootstrapped (and we are part of the committee) or we are ignoring being bootstrapped we issue
 	// a validation block, reviving the chain if necessary.
-	if err := issueValidatonBlock(ctx, now, currentAPI, committeeBroadcastInterval); err != nil {
+	if err := issueValidationBlock(ctx, now, currentAPI, committeeBroadcastInterval); err != nil {
 		Component.LogWarnf("error while trying to issue validation block: %s", err.Error())
 	}
 }
@@ -152,7 +152,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	return nil
 }
 
-func issueValidatonBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API, committeeBroadcastInterval time.Duration) error {
+func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API, committeeBroadcastInterval time.Duration) error {
 	protocolParametersHash, err := currentAPI.ProtocolParameters().Hash()
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
