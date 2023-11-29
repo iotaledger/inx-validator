@@ -73,13 +73,17 @@ func committeeMemberAction(ctx context.Context) {
 	currentAPI := deps.NodeBridge.APIProvider().APIForTime(now)
 	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
 	currentEpoch := currentAPI.TimeProvider().EpochFromSlot(currentSlot)
+	slotDurationMillis := int64(currentAPI.ProtocolParameters().SlotDurationInSeconds()) * 1000
+	// Calculate the broadcast interval in milliseconds.
+	broadcastIntervalMillis := slotDurationMillis / int64(currentAPI.ProtocolParameters().ValidationBlocksPerSlot())
+	committeeBroadcastInterval := time.Duration(broadcastIntervalMillis * int64(time.Millisecond))
 
 	// If we are bootstrapped let's check if we are part of the committee.
 	if deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
 		isCommitteeMember, err := deps.NodeBridge.ReadIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
 		if err != nil {
 			Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
-			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
+			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
 
 			return
 		}
@@ -92,21 +96,21 @@ func committeeMemberAction(ctx context.Context) {
 		}
 	}
 
-	// Schedule next committeeMemberAction regardless of whether the node is bootstrapped or validator block is issued
+	// Schedule next committeeMemberAction regardless of whether the node is bootstrapped or validation block is issued
 	// as it must be issued as part of validator's responsibility.
-	executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(ParamsValidator.CommitteeBroadcastInterval))
+	executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
 
 	// If we are not bootstrapped and we are _not_ ignoring such condition, we return.
 	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() && !ParamsValidator.IgnoreBootstrapped {
-		Component.LogDebug("not issuing validator block because node is not bootstrapped yet.")
+		Component.LogDebug("not issuing validation block because node is not bootstrapped yet.")
 
 		return
 	}
 
 	// If we are either bootstrapped (and we are part of the committee) or we are ignoring being bootstrapped we issue
 	// a validation block, reviving the chain if necessary.
-	if err := issueValidatorBlock(ctx, now, currentAPI); err != nil {
-		Component.LogWarnf("error while trying to issue validator block: %s", err.Error())
+	if err := issueValidationBlock(ctx, now, currentAPI, committeeBroadcastInterval); err != nil {
+		Component.LogWarnf("error while trying to issue validation block: %s", err.Error())
 	}
 }
 
@@ -148,7 +152,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	return nil
 }
 
-func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
+func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API, committeeBroadcastInterval time.Duration) error {
 	protocolParametersHash, err := currentAPI.ProtocolParameters().Hash()
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
@@ -196,10 +200,10 @@ func issueValidatorBlock(ctx context.Context, blockIssuingTime time.Time, curren
 
 	blockID, err := deps.NodeBridge.SubmitBlock(ctx, validationBlock)
 	if err != nil {
-		return ierrors.Wrapf(err, "error issuing validator block")
+		return ierrors.Wrapf(err, "error issuing validation block")
 	}
 
-	Component.LogDebugf("issued validator block: %s - commitment %s %d - latest finalized slot %d", blockID, validationBlock.Header.SlotCommitmentID, validationBlock.Header.SlotCommitmentID.Slot(), validationBlock.Header.LatestFinalizedSlot)
+	Component.LogDebugf("issued validation block: %s - commitment %s %d - latest finalized slot %d - broadcast interval %v", blockID, validationBlock.Header.SlotCommitmentID, validationBlock.Header.SlotCommitmentID.Slot(), validationBlock.Header.LatestFinalizedSlot, committeeBroadcastInterval.Truncate(time.Millisecond))
 
 	return nil
 }
