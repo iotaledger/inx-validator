@@ -129,20 +129,18 @@ Example:
 
 ## <a id="validator"></a> 4. Validator
 
-| Name                       | Description                                                                                                  | Type    | Default value |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
-| committeeBroadcastInterval | The interval at which committee validator block will be broadcast                                            | string  | "500ms"       |
-| candidacyRetryInterval     | The interval at which broadcast of candidacy announcement block will be retried                              | string  | "10s"         |
-| issueCandidacyPayload      | Whether the node should issue a candidacy payload                                                            | boolean | true          |
-| ignoreBootstrapped         | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
-| accountAddress             | The account address of the validator account that will issue the blocks                                      | string  | ""            |
+| Name                   | Description                                                                                                  | Type    | Default value |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
+| candidacyRetryInterval | The interval at which broadcast of candidacy announcement block will be retried                              | string  | "10s"         |
+| issueCandidacyPayload  | Whether the node should issue a candidacy payload                                                            | boolean | true          |
+| ignoreBootstrapped     | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
+| accountAddress         | The account address of the validator account that will issue the blocks                                      | string  | ""            |
 
 Example:
 
 ```json
   {
     "validator": {
-      "committeeBroadcastInterval": "500ms",
       "candidacyRetryInterval": "10s",
       "issueCandidacyPayload": true,
       "ignoreBootstrapped": false,
