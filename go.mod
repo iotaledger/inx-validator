@@ -8,7 +8,7 @@ require (
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20231128121006-331a9e522dfe
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231128121006-331a9e522dfe
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231128163614-c82e1fa40733
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231128162016-23f1b4e12cec
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231201103607-03a45ba3707f
 	go.uber.org/dig v1.17.1
 
 )
