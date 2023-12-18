@@ -44,7 +44,7 @@ func readIsValidatorAccount(ctx context.Context, accountID iotago.AccountID, slo
 }
 
 // requestTips requests tips from the node.
-func requestTips(ctx context.Context, count uint32) (strong iotago.BlockIDs, weak iotago.BlockIDs, shallowLike iotago.BlockIDs, err error) {
+func requestTips(ctx context.Context, count uint32) (iotago.BlockIDs, iotago.BlockIDs, iotago.BlockIDs, error) {
 	ctx, cancel := context.WithTimeout(ctx, TimeoutINXRequestTips)
 	defer cancel()
 
