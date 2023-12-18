@@ -117,7 +117,8 @@ func run() error {
 
 		<-ctx.Done()
 
-		executor.Shutdown()
+		// we can cancel the pending elements here, because we don't want to issue any more blocks
+		executor.Shutdown(timed.CancelPendingElements)
 
 		Component.LogInfo("Stopping Validator... done")
 	}, daemon.PriorityStopValidator)
