@@ -117,14 +117,15 @@ func run() error {
 
 		<-ctx.Done()
 
-		executor.Shutdown()
+		// we can cancel the pending elements here, because we don't want to issue any more blocks
+		executor.Shutdown(timed.CancelPendingElements)
 
 		Component.LogInfo("Stopping Validator... done")
 	}, daemon.PriorityStopValidator)
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	isAccountValidator, err := deps.NodeBridge.ReadIsValidatorAccount(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
+	isAccountValidator, err := readIsValidatorAccount(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
 	if err != nil {
 		Component.LogErrorf("error when retrieving Validator account %s: %w", validatorAccount.ID(), err)
 
