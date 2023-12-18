@@ -125,7 +125,7 @@ func run() error {
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	isAccountValidator, err := deps.NodeBridge.ReadIsValidatorAccount(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
+	isAccountValidator, err := readIsValidatorAccount(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
 	if err != nil {
 		Component.LogErrorf("error when retrieving Validator account %s: %w", validatorAccount.ID(), err)
 

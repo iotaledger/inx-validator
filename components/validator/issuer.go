@@ -23,7 +23,7 @@ func candidateAction(ctx context.Context) {
 	currentAPI := deps.NodeBridge.APIProvider().APIForTime(now)
 	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
 
-	isCandidate, err := deps.NodeBridge.ReadIsCandidate(ctx, validatorAccount.ID(), currentSlot)
+	isCandidate, err := readIsCandidate(ctx, validatorAccount.ID(), currentSlot)
 	if err != nil {
 		Component.LogWarnf("error while checking if account is already a candidate: %s", err.Error())
 		// If there is an error, then retry registering as a candidate.
@@ -80,7 +80,7 @@ func committeeMemberAction(ctx context.Context) {
 
 	// If we are bootstrapped let's check if we are part of the committee.
 	if deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
-		isCommitteeMember, err := deps.NodeBridge.ReadIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
+		isCommitteeMember, err := readIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
 		if err != nil {
 			Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
 			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
@@ -117,7 +117,7 @@ func committeeMemberAction(ctx context.Context) {
 func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
-	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.BasicBlockMaxParents)
+	strongParents, weakParents, shallowLikeParents, err := requestTips(ctx, iotago.BasicBlockMaxParents)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get tips")
 	}
@@ -142,7 +142,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		return ierrors.Wrap(err, "error creating block")
 	}
 
-	blockID, err := deps.NodeBridge.SubmitBlock(ctx, candidacyBlock)
+	blockID, err := submitBlock(ctx, candidacyBlock)
 	if err != nil {
 		return ierrors.Wrap(err, "error issuing candidacy announcement block")
 	}
@@ -158,7 +158,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
 	}
 
-	strongParents, weakParents, shallowLikeParents, err := deps.NodeBridge.RequestTips(ctx, iotago.ValidationBlockMaxParents)
+	strongParents, weakParents, shallowLikeParents, err := requestTips(ctx, iotago.ValidationBlockMaxParents)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get tips")
 	}
@@ -198,7 +198,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		return ierrors.Wrapf(err, "error creating validation block")
 	}
 
-	blockID, err := deps.NodeBridge.SubmitBlock(ctx, validationBlock)
+	blockID, err := submitBlock(ctx, validationBlock)
 	if err != nil {
 		return ierrors.Wrapf(err, "error issuing validation block")
 	}
@@ -212,7 +212,7 @@ func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment
 	lastCommittedSlot := deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot()
 	apiForSlot := deps.NodeBridge.APIProvider().APIForSlot(lastCommittedSlot)
 
-	activeRootBlocks, err := deps.NodeBridge.ActiveRootBlocks(ctx)
+	activeRootBlocks, err := activeRootBlocks(ctx)
 	if err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to retrieve active root blocks")
 	}
@@ -239,11 +239,11 @@ func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment
 	}
 	commitUntilSlot := issuingSlot - apiForSlot.ProtocolParameters().MinCommittableAge()
 
-	if err = deps.NodeBridge.ForceCommitUntil(ctx, commitUntilSlot); err != nil {
+	if err = forceCommitUntil(ctx, commitUntilSlot); err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to force commit until slot %d", commitUntilSlot)
 	}
 
-	commitment, err := deps.NodeBridge.Commitment(ctx, commitUntilSlot)
+	commitment, err := commitment(ctx, commitUntilSlot)
 	if err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
 	}
@@ -253,19 +253,19 @@ func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment
 
 func getAddressableCommitment(ctx context.Context, blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
 	protoParams := deps.NodeBridge.APIProvider().APIForSlot(blockSlot).ProtocolParameters()
-	commitment := deps.NodeBridge.LatestCommitment().Commitment
+	latestCommitment := deps.NodeBridge.LatestCommitment().Commitment
 
-	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
-		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
+	if blockSlot > latestCommitment.Slot+protoParams.MaxCommittableAge() {
+		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, latestCommitment.Slot)
 	}
 
-	if blockSlot < commitment.Slot+protoParams.MinCommittableAge() {
-		if blockSlot < protoParams.GenesisSlot()+protoParams.MinCommittableAge() || commitment.Slot < protoParams.GenesisSlot()+protoParams.MinCommittableAge() {
-			return commitment, nil
+	if blockSlot < latestCommitment.Slot+protoParams.MinCommittableAge() {
+		if blockSlot < protoParams.GenesisSlot()+protoParams.MinCommittableAge() || latestCommitment.Slot < protoParams.GenesisSlot()+protoParams.MinCommittableAge() {
+			return latestCommitment, nil
 		}
 
-		commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
-		loadedCommitment, err := deps.NodeBridge.Commitment(ctx, commitmentSlot)
+		commitmentSlot := latestCommitment.Slot - protoParams.MinCommittableAge()
+		loadedCommitment, err := commitment(ctx, commitmentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge", commitmentSlot)
 		}
@@ -273,5 +273,5 @@ func getAddressableCommitment(ctx context.Context, blockSlot iotago.SlotIndex) (
 		return loadedCommitment.Commitment, nil
 	}
 
-	return commitment, nil
+	return latestCommitment, nil
 }
