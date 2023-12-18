@@ -26,8 +26,11 @@ func candidateAction(ctx context.Context) {
 	isCandidate, err := readIsCandidate(ctx, validatorAccount.ID(), currentSlot)
 	if err != nil {
 		Component.LogWarnf("error while checking if account is already a candidate: %s", err.Error())
-		// If there is an error, then retry registering as a candidate.
-		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
+
+		// If there is an error, then retry registering as a candidate, except if the context was canceled.
+		if !ierrors.Is(err, context.Canceled) {
+			executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
+		}
 
 		return
 	}
@@ -83,7 +86,11 @@ func committeeMemberAction(ctx context.Context) {
 		isCommitteeMember, err := readIsCommitteeMember(ctx, validatorAccount.ID(), currentSlot)
 		if err != nil {
 			Component.LogWarnf("error while checking if account %s is a committee member in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
-			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
+
+			// If there is an error, then retry, except if the context was canceled.
+			if !ierrors.Is(err, context.Canceled) {
+				executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
+			}
 
 			return
 		}
