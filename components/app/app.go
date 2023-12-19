@@ -13,7 +13,7 @@ var (
 	Name = "inx-validator"
 
 	// Version of the app.
-	Version = "1.0.0-alpha.11"
+	Version = "1.0.0-alpha.12"
 )
 
 func App() *app.App {
