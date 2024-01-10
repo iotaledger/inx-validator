@@ -1,6 +1,6 @@
 # INX-Validator
 
-[![Go](https://github.com/iotaledger/inx-validator/actions/workflows/build.yml/badge.svg)](https://github.com/iotaledger/inx-validatoractions/workflows/build.yml)
+[![Go](https://github.com/iotaledger/inx-validator/actions/workflows/build.yml/badge.svg)](https://github.com/iotaledger/inx-validator/actions/workflows/build.yml)
 
 INX-Validator implements an IOTA 2.0 validator and can be used togeter with [iota-core](https://github.com/iotaledger/iota-core) to validate IOTA 2.0 compatible networks.
 
