@@ -109,7 +109,7 @@ func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		Component.LogInfof("Starting Validator with IssuerID: %s", validatorAccount.ID())
 
-		deps.NodeBridge.Events().LatestCommitmentChanged.Hook(func(details *nodebridge.Commitment) {
+		deps.NodeBridge.Events().LatestCommitmentChanged.Hook(func(_ *nodebridge.Commitment) {
 			checkValidatorStatus(ctx)
 		}, event.WithWorkerPool(Component.WorkerPool))
 
