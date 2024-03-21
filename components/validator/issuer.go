@@ -216,7 +216,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 }
 
 func reviveChain(ctx context.Context, issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, error) {
-	lastCommittedSlot := deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot()
+	lastCommittedSlot := deps.NodeBridge.NodeStatus().GetLatestCommitment().GetCommitmentId().Unwrap().Slot()
 	apiForSlot := deps.NodeBridge.APIProvider().APIForSlot(lastCommittedSlot)
 
 	activeRootBlocks, err := activeRootBlocks(ctx)

@@ -125,7 +125,7 @@ func run() error {
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	isAccountValidator, err := readIsValidatorAccount(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().LatestCommitment.CommitmentId.Unwrap().Slot())
+	isAccountValidator, err := readIsValidatorAccount(ctx, validatorAccount.ID(), deps.NodeBridge.NodeStatus().GetLatestCommitment().GetCommitmentId().Unwrap().Slot())
 	if err != nil {
 		Component.LogErrorf("error when retrieving Validator account %s: %w", validatorAccount.ID(), err)
 
@@ -173,7 +173,6 @@ func loadEd25519PrivateKeysFromEnvironment(name string) ([]ed25519.PrivateKey, e
 		privateKey, err := crypto.ParseEd25519PrivateKeyFromString(key)
 		if err != nil {
 			return nil, ierrors.Errorf("environment variable '%s' contains an invalid private key '%s'", name, key)
-
 		}
 		privateKeys[i] = privateKey
 	}
