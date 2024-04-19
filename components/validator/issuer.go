@@ -167,6 +167,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		return ierrors.Wrap(err, "error getting congestion")
 	}
 
+	//nolint:forcetypeassert // we know that the body is a BasicBlockBody
 	if congestionResp.BlockIssuanceCredits < 0 || iotago.Mana(congestionResp.BlockIssuanceCredits) < candidacyBlock.Body.(*iotago.BasicBlockBody).MaxBurnedMana {
 		return ierrors.WithMessagef(ErrNotEnoughBlockIssuanceCredits, "account BIC %d is not enough to send candidacy announcement with MaxBurnedMana %d", congestionResp.BlockIssuanceCredits, candidacyBlock.Body.(*iotago.BasicBlockBody).MaxBurnedMana)
 	}
