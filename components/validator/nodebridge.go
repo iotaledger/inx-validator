@@ -6,13 +6,14 @@ import (
 
 	"github.com/iotaledger/inx-app/pkg/nodebridge"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
 	TimeoutINXReadIsCandidate        = 1 * time.Second
 	TimeoutINXReadIsCommitteeMember  = 1 * time.Second
 	TimeoutINXReadIsValidatorAccount = 1 * time.Second
-	TimeoutINXRequestTips            = 2 * time.Second
+	TimeoutINXBlockIssuance          = 2 * time.Second
 	TimeoutINXSubmitBlock            = 2 * time.Second
 	TimeoutINXActiveRootBlocks       = 2 * time.Second
 	TimeoutINXForceCommitUntil       = 5 * time.Second
@@ -43,12 +44,12 @@ func readIsValidatorAccount(ctx context.Context, accountID iotago.AccountID, slo
 	return deps.NodeBridge.ReadIsValidatorAccount(ctx, accountID, slot)
 }
 
-// requestTips requests tips from the node.
-func requestTips(ctx context.Context, count uint32) (iotago.BlockIDs, iotago.BlockIDs, iotago.BlockIDs, error) {
-	ctx, cancel := context.WithTimeout(ctx, TimeoutINXRequestTips)
+// blockIssuance requests the necessary data to issue a block.
+func blockIssuance(ctx context.Context, maxParentCount uint32) (*api.IssuanceBlockHeaderResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, TimeoutINXBlockIssuance)
 	defer cancel()
 
-	return deps.NodeBridge.RequestTips(ctx, count)
+	return deps.NodeBridge.BlockIssuance(ctx, maxParentCount)
 }
 
 // submitBlock submits a block to the node.
