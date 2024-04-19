@@ -9,7 +9,10 @@ import (
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
-var ErrBlockTooRecent = ierrors.New("block is too recent compared to latest commitment")
+var (
+	ErrBlockTooRecent                = ierrors.New("block is too recent compared to latest commitment")
+	ErrNotEnoughBlockIssuanceCredits = ierrors.New("not enough block issuance credits")
+)
 
 type TaskType uint8
 
@@ -152,6 +155,21 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 		Build()
 	if err != nil {
 		return ierrors.Wrap(err, "error creating block")
+	}
+
+	nodeClient, err := deps.NodeBridge.INXNodeClient()
+	if err != nil {
+		return ierrors.Wrap(err, "error getting node client")
+	}
+
+	congestionResp, err := nodeClient.Congestion(ctx, validatorAccount.ID().ToAddress().(*iotago.AccountAddress), 0, addressableCommitment.MustID())
+	if err != nil {
+		return ierrors.Wrap(err, "error getting congestion")
+	}
+
+	//nolint:forcetypeassert // we know that the body is a BasicBlockBody
+	if congestionResp.BlockIssuanceCredits < 0 || iotago.Mana(congestionResp.BlockIssuanceCredits) < candidacyBlock.Body.(*iotago.BasicBlockBody).MaxBurnedMana {
+		return ierrors.WithMessagef(ErrNotEnoughBlockIssuanceCredits, "account BIC %d is not enough to send candidacy announcement with MaxBurnedMana %d", congestionResp.BlockIssuanceCredits, candidacyBlock.Body.(*iotago.BasicBlockBody).MaxBurnedMana)
 	}
 
 	blockID, err := submitBlock(ctx, candidacyBlock)
