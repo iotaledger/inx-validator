@@ -142,7 +142,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	candidacyBlock, err := builder.NewBasicBlockBuilder(currentAPI).
 		IssuingTime(blockIssuingTime).
 		SlotCommitmentID(addressableCommitment.MustID()).
-		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot).
+		LatestFinalizedSlot(issuanceBlockHeaderResponse.LatestFinalizedSlot).
 		StrongParents(issuanceBlockHeaderResponse.StrongParents).
 		WeakParents(issuanceBlockHeaderResponse.WeakParents).
 		ShallowLikeParents(issuanceBlockHeaderResponse.ShallowLikeParents).
@@ -207,7 +207,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		ProtocolParametersHash(protocolParametersHash).
 		SlotCommitmentID(addressableCommitment.MustID()).
 		HighestSupportedVersion(deps.NodeBridge.APIProvider().LatestAPI().Version()).
-		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot).
+		LatestFinalizedSlot(issuanceBlockHeaderResponse.LatestFinalizedSlot).
 		StrongParents(issuanceBlockHeaderResponse.StrongParents).
 		WeakParents(issuanceBlockHeaderResponse.WeakParents).
 		ShallowLikeParents(issuanceBlockHeaderResponse.ShallowLikeParents).
