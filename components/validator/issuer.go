@@ -124,9 +124,14 @@ func committeeMemberAction(ctx context.Context) {
 func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
-	strongParents, weakParents, shallowLikeParents, err := requestTips(ctx, iotago.BasicBlockMaxParents)
+	issuanceBlockHeaderResponse, err := blockIssuance(ctx, iotago.BasicBlockMaxParents)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get tips")
+		return ierrors.Wrapf(err, "failed to get blockIssuance")
+	}
+
+	latestParentBlockIssuingTime := issuanceBlockHeaderResponse.LatestParentBlockIssuingTime.Add(time.Nanosecond)
+	if blockIssuingTime.Before(latestParentBlockIssuingTime) {
+		blockIssuingTime = latestParentBlockIssuingTime
 	}
 
 	addressableCommitment, err := getAddressableCommitment(ctx, blockSlot)
@@ -137,10 +142,10 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	candidacyBlock, err := builder.NewBasicBlockBuilder(currentAPI).
 		IssuingTime(blockIssuingTime).
 		SlotCommitmentID(addressableCommitment.MustID()).
-		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot).
-		StrongParents(strongParents).
-		WeakParents(weakParents).
-		ShallowLikeParents(shallowLikeParents).
+		LatestFinalizedSlot(issuanceBlockHeaderResponse.LatestFinalizedSlot).
+		StrongParents(issuanceBlockHeaderResponse.StrongParents).
+		WeakParents(issuanceBlockHeaderResponse.WeakParents).
+		ShallowLikeParents(issuanceBlockHeaderResponse.ShallowLikeParents).
 		Payload(&iotago.CandidacyAnnouncement{}).
 		CalculateAndSetMaxBurnedMana(addressableCommitment.ReferenceManaCost).
 		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
@@ -165,9 +170,14 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
 	}
 
-	strongParents, weakParents, shallowLikeParents, err := requestTips(ctx, iotago.ValidationBlockMaxParents)
+	issuanceBlockHeaderResponse, err := blockIssuance(ctx, iotago.ValidationBlockMaxParents)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get tips")
+		return ierrors.Wrapf(err, "failed to get blockIssuance")
+	}
+
+	latestParentBlockIssuingTime := issuanceBlockHeaderResponse.LatestParentBlockIssuingTime.Add(time.Nanosecond)
+	if blockIssuingTime.Before(latestParentBlockIssuingTime) {
+		blockIssuingTime = latestParentBlockIssuingTime
 	}
 
 	addressableCommitment, err := getAddressableCommitment(ctx, currentAPI.TimeProvider().SlotFromTime(blockIssuingTime))
@@ -184,7 +194,9 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		}
 
 		addressableCommitment = commitment
-		strongParents = []iotago.BlockID{parentID}
+		issuanceBlockHeaderResponse.StrongParents = []iotago.BlockID{parentID}
+		issuanceBlockHeaderResponse.WeakParents = []iotago.BlockID{}
+		issuanceBlockHeaderResponse.ShallowLikeParents = []iotago.BlockID{}
 	} else if err != nil {
 		return ierrors.Wrapf(err, "error getting commitment")
 	}
@@ -195,10 +207,10 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		ProtocolParametersHash(protocolParametersHash).
 		SlotCommitmentID(addressableCommitment.MustID()).
 		HighestSupportedVersion(deps.NodeBridge.APIProvider().LatestAPI().Version()).
-		LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot).
-		StrongParents(strongParents).
-		WeakParents(weakParents).
-		ShallowLikeParents(shallowLikeParents).
+		LatestFinalizedSlot(issuanceBlockHeaderResponse.LatestFinalizedSlot).
+		StrongParents(issuanceBlockHeaderResponse.StrongParents).
+		WeakParents(issuanceBlockHeaderResponse.WeakParents).
+		ShallowLikeParents(issuanceBlockHeaderResponse.ShallowLikeParents).
 		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
 		Build()
 	if err != nil {
