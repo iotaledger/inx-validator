@@ -23,8 +23,18 @@ const (
 
 func candidateAction(ctx context.Context) {
 	now := time.Now()
+
 	currentAPI := deps.NodeBridge.APIProvider().APIForTime(now)
 	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
+
+	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
+		Component.LogDebugf("not issuing candidacy announcement for account %s in slot %d because node is not bootstrapped yet.", validatorAccount.ID(), currentSlot)
+
+		// If a node is not bootstrapped, then retry until it is bootstrapped.
+		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
+
+		return
+	}
 
 	isCandidate, err := readIsCandidate(ctx, validatorAccount.ID(), currentSlot)
 	if err != nil {
@@ -56,18 +66,11 @@ func candidateAction(ctx context.Context) {
 	}
 
 	// Schedule next committeeMemberAction regardless of the result below.
-	// If a node is not bootstrapped, then retry until it is bootstrapped.
 	// The candidacy block might be issued and fail to be accepted in the node for various reasons,
 	// so we should stop issuing candidacy blocks only when the account is successfully registered as a candidate.
 	// For this reason,
 	// retry interval parameter should be bigger than the fishing threshold to avoid issuing redundant candidacy blocks.
 	executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
-
-	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
-		Component.LogDebug("not issuing candidate block because node is not bootstrapped yet.")
-
-		return
-	}
 
 	if err = issueCandidateBlock(ctx, now, currentAPI); err != nil {
 		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
@@ -76,13 +79,25 @@ func candidateAction(ctx context.Context) {
 
 func committeeMemberAction(ctx context.Context) {
 	now := time.Now()
+
 	currentAPI := deps.NodeBridge.APIProvider().APIForTime(now)
 	currentSlot := currentAPI.TimeProvider().SlotFromTime(now)
 	currentEpoch := currentAPI.TimeProvider().EpochFromSlot(currentSlot)
-	slotDurationMillis := int64(currentAPI.ProtocolParameters().SlotDurationInSeconds()) * 1000
+
 	// Calculate the broadcast interval in milliseconds.
+	slotDurationMillis := int64(currentAPI.ProtocolParameters().SlotDurationInSeconds()) * 1000
 	broadcastIntervalMillis := slotDurationMillis / int64(currentAPI.ProtocolParameters().ValidationBlocksPerSlot())
 	committeeBroadcastInterval := time.Duration(broadcastIntervalMillis * int64(time.Millisecond))
+
+	// If we are not bootstrapped and we are _not_ ignoring such condition, we return.
+	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() && !ParamsValidator.IgnoreBootstrapped {
+		Component.LogDebugf("not issuing validation block for account %s because node is not bootstrapped yet.", validatorAccount.ID())
+
+		// If a node is not bootstrapped, then retry until it is bootstrapped.
+		executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
+
+		return
+	}
 
 	// If we are bootstrapped let's check if we are part of the committee.
 	if deps.NodeBridge.NodeStatus().GetIsBootstrapped() {
@@ -106,16 +121,9 @@ func committeeMemberAction(ctx context.Context) {
 		}
 	}
 
-	// Schedule next committeeMemberAction regardless of whether the node is bootstrapped or validation block is issued
+	// Schedule next committeeMemberAction regardless of whether the validation block is issued or not
 	// as it must be issued as part of validator's responsibility.
 	executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, now.Add(committeeBroadcastInterval))
-
-	// If we are not bootstrapped and we are _not_ ignoring such condition, we return.
-	if !deps.NodeBridge.NodeStatus().GetIsBootstrapped() && !ParamsValidator.IgnoreBootstrapped {
-		Component.LogDebug("not issuing validation block because node is not bootstrapped yet.")
-
-		return
-	}
 
 	// If we are either bootstrapped (and we are part of the committee) or we are ignoring being bootstrapped we issue
 	// a validation block, reviving the chain if necessary.
