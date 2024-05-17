@@ -38,7 +38,7 @@ func candidateAction(ctx context.Context) {
 
 	isCandidate, err := readIsCandidate(ctx, validatorAccount.ID(), currentSlot)
 	if err != nil {
-		Component.LogWarnf("error while checking if account is already a candidate: %s", err.Error())
+		Component.LogWarnf("error while checking if account %s is already a candidate: %s", validatorAccount.ID(), err.Error())
 
 		// If there is an error, then retry registering as a candidate, except if the context was canceled.
 		if !ierrors.Is(err, context.Canceled) {
@@ -49,7 +49,8 @@ func candidateAction(ctx context.Context) {
 	}
 
 	if isCandidate {
-		Component.LogDebugf("not issuing candidacy announcement block as account %s is already registered as candidate in epoch %d", validatorAccount.ID(), currentAPI.TimeProvider().EpochFromSlot(currentSlot))
+		Component.LogDebugf("not issuing candidacy announcement for account %s in slot %d as it is already registered as candidate in epoch %d", validatorAccount.ID(), currentSlot, currentAPI.TimeProvider().EpochFromSlot(currentSlot))
+
 		// If an account is a registered candidate, then try to register as a candidate in the next epoch.
 		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
 
@@ -59,6 +60,7 @@ func candidateAction(ctx context.Context) {
 	epochEndSlot := currentAPI.TimeProvider().EpochEnd(currentAPI.TimeProvider().EpochFromSlot(currentSlot))
 	if currentSlot+currentAPI.ProtocolParameters().EpochNearingThreshold() > epochEndSlot {
 		Component.LogDebugf("not issuing candidacy announcement for account %s as block's slot would be issued in (%d) is past the Epoch Nearing Threshold (%d) of epoch %d", validatorAccount.ID(), currentSlot, epochEndSlot-currentAPI.ProtocolParameters().EpochNearingThreshold(), currentAPI.TimeProvider().EpochFromSlot(currentSlot))
+
 		// If it's too late to register as a candidate, then try to register in the next epoch.
 		executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentAPI.TimeProvider().EpochFromSlot(currentSlot)+1)))
 
@@ -73,7 +75,7 @@ func candidateAction(ctx context.Context) {
 	executor.ExecuteAt(CandidateTask, func() { candidateAction(ctx) }, now.Add(ParamsValidator.CandidacyRetryInterval))
 
 	if err = issueCandidateBlock(ctx, now, currentAPI); err != nil {
-		Component.LogWarnf("error while trying to issue candidacy announcement: %s", err.Error())
+		Component.LogWarnf("error while trying to issue candidacy announcement for account %s in slot %d: %s", validatorAccount.ID(), currentSlot, err.Error())
 	}
 }
 
@@ -114,7 +116,7 @@ func committeeMemberAction(ctx context.Context) {
 		}
 
 		if !isCommitteeMember {
-			Component.LogDebug("account %s is not a committee member in epoch %d", currentEpoch)
+			Component.LogDebugf("account %s is not a committee member in epoch %d", validatorAccount.ID(), currentEpoch)
 			executor.ExecuteAt(CommitteeTask, func() { committeeMemberAction(ctx) }, currentAPI.TimeProvider().SlotStartTime(currentAPI.TimeProvider().EpochStart(currentEpoch+1)))
 
 			return
@@ -128,7 +130,7 @@ func committeeMemberAction(ctx context.Context) {
 	// If we are either bootstrapped (and we are part of the committee) or we are ignoring being bootstrapped we issue
 	// a validation block, reviving the chain if necessary.
 	if err := issueValidationBlock(ctx, now, currentAPI, committeeBroadcastInterval); err != nil {
-		Component.LogWarnf("error while trying to issue validation block: %s", err.Error())
+		Component.LogWarnf("error while trying to issue validation block for account %s: %s", validatorAccount.ID(), err.Error())
 	}
 }
 
@@ -137,7 +139,7 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 
 	issuanceBlockHeaderResponse, err := blockIssuance(ctx, iotago.BasicBlockMaxParents)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get blockIssuance")
+		return ierrors.Wrap(err, "failed to get blockIssuance")
 	}
 
 	latestParentBlockIssuingTime := issuanceBlockHeaderResponse.LatestParentBlockIssuingTime.Add(time.Nanosecond)
@@ -193,12 +195,12 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API, committeeBroadcastInterval time.Duration) error {
 	protocolParametersHash, err := currentAPI.ProtocolParameters().Hash()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get protocol parameters hash")
+		return ierrors.Wrap(err, "failed to get protocol parameters hash")
 	}
 
 	issuanceBlockHeaderResponse, err := blockIssuance(ctx, iotago.ValidationBlockMaxParents)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get blockIssuance")
+		return ierrors.Wrap(err, "failed to get blockIssuance")
 	}
 
 	latestParentBlockIssuingTime := issuanceBlockHeaderResponse.LatestParentBlockIssuingTime.Add(time.Nanosecond)
@@ -216,7 +218,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		// to allow the validator to issue validation blocks.
 		commitment, parentID, reviveChainErr := reviveChain(ctx, blockIssuingTime)
 		if reviveChainErr != nil {
-			return ierrors.Wrapf(err, "error reviving chain")
+			return ierrors.Wrap(err, "error reviving chain")
 		}
 
 		addressableCommitment = commitment
@@ -224,7 +226,7 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		issuanceBlockHeaderResponse.WeakParents = []iotago.BlockID{}
 		issuanceBlockHeaderResponse.ShallowLikeParents = []iotago.BlockID{}
 	} else if err != nil {
-		return ierrors.Wrapf(err, "error getting commitment")
+		return ierrors.Wrap(err, "error getting commitment")
 	}
 
 	// create the validation block here using the validation block builder from iota.go
@@ -240,12 +242,12 @@ func issueValidationBlock(ctx context.Context, blockIssuingTime time.Time, curre
 		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
 		Build()
 	if err != nil {
-		return ierrors.Wrapf(err, "error creating validation block")
+		return ierrors.Wrap(err, "error creating validation block")
 	}
 
 	blockID, err := submitBlock(ctx, validationBlock)
 	if err != nil {
-		return ierrors.Wrapf(err, "error issuing validation block")
+		return ierrors.Wrap(err, "error issuing validation block")
 	}
 
 	Component.LogDebugf("issued validation block: %s - commitment %s %d - latest finalized slot %d - broadcast interval %v", blockID, validationBlock.Header.SlotCommitmentID, validationBlock.Header.SlotCommitmentID.Slot(), validationBlock.Header.LatestFinalizedSlot, committeeBroadcastInterval.Truncate(time.Millisecond))
