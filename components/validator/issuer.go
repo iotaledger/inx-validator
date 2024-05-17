@@ -135,8 +135,6 @@ func committeeMemberAction(ctx context.Context) {
 }
 
 func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, currentAPI iotago.API) error {
-	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
-
 	issuanceBlockHeaderResponse, err := blockIssuance(ctx, iotago.BasicBlockMaxParents)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to get blockIssuance")
@@ -146,6 +144,8 @@ func issueCandidateBlock(ctx context.Context, blockIssuingTime time.Time, curren
 	if blockIssuingTime.Before(latestParentBlockIssuingTime) {
 		blockIssuingTime = latestParentBlockIssuingTime
 	}
+
+	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
 	addressableCommitment, err := getAddressableCommitment(ctx, blockSlot)
 	if err != nil {
